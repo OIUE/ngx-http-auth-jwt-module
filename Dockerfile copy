@@ -92,6 +92,7 @@ RUN wget http://nginx.org/download/nginx-$NGINX_VERSION.tar.gz && \
     cd /root/dl/nginx && \
     ./configure \
       --add-dynamic-module=../ngx-http-auth-jwt-module \
+      --add-dynamic-module=../rate-limit-nginx-module \
       --prefix=/usr/share/nginx \
       --sbin-path=/usr/sbin/nginx \
       --modules-path=/usr/lib64/nginx/modules \

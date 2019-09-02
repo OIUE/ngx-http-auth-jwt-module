@@ -47,3 +47,18 @@ int hex_to_binary( const char* str, u_char* buf, int len )
 	}
 	return 0;
 }
+
+int arrayToStr(u_char *buf,  int buflen,char *out)
+{
+    char strBuf[33] = {0};
+    char pbuf[32];
+    int i;
+    for(i = 0; i < buflen; i++)
+    {
+        sprintf(pbuf, "%02X", buf[i]);
+        strncat(strBuf, pbuf, 2);
+    }
+    strncpy(out, strBuf, buflen * 2);
+    //printf("out = %s\n", out);
+    return buflen * 2;
+}

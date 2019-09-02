@@ -37,8 +37,9 @@ stop-nginx:
 
 .PHONY: start-nginx
 start-nginx:
-	docker run --rm --name "$(DOCKER_IMAGE_NAME)-cont" -d -p 8000:8000 $(DOCKER_ORG_NAME)/$(DOCKER_IMAGE_NAME)
+	docker run --rm --name "$(DOCKER_IMAGE_NAME)-cont" -v /Users/every/eclipse-workspace/git/ngx-http-auth-jwt-module:/root/dl/ngx-http-auth-jwt-module -v /Users/every/eclipse-workspace/git/rate-limit-nginx-module:/root/dl/rate-limit-nginx-module -d -p 8000:8000 -p2222:22 --privileged=true -it $(DOCKER_ORG_NAME)/$(DOCKER_IMAGE_NAME)
 	docker cp $(DOCKER_IMAGE_NAME)-cont:/usr/lib64/nginx/modules/ngx_http_auth_jwt_module.so .
+	docker cp ~/test.html jwt-nginx-cont:/usr/share/nginx/html/
 
 .PHONY: build-test-runner
 build-test-runner:

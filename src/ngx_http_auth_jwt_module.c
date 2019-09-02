@@ -13,6 +13,7 @@
 #include <jwt.h>
 
 #include <jansson.h>
+//#include <base64.h>
 
 #include "ngx_http_auth_jwt_header_processing.h"
 #include "ngx_http_auth_jwt_binary_converters.h"
@@ -123,24 +124,21 @@ ngx_module_t ngx_http_auth_jwt_module = {
 
 static ngx_int_t ngx_http_auth_jwt_handler(ngx_http_request_t *r)
 {
-	ngx_str_t useridHeaderName = ngx_string("x-userid");
-	ngx_str_t emailHeaderName = ngx_string("x-email");
 	char* jwtCookieValChrPtr;
 	char* return_url;
 	ngx_http_auth_jwt_loc_conf_t *jwtcf;
-	u_char *keyBinary;
+	u_char *keyBinary = NULL;
 	jwt_t *jwt = NULL;
 	int jwtParseReturnCode;
 	jwt_alg_t alg;
-	const char* sub;
-	const char* email;
-	ngx_str_t sub_t;
-	ngx_str_t email_t;
 	time_t exp;
 	time_t now;
 	ngx_str_t auth_jwt_algorithm;
 	int keylen;
-	
+    ngx_table_elt_t *h;
+    ngx_str_t authKey = ngx_string("Authorization");
+    char* tjwt=NULL;
+    
 	jwtcf = ngx_http_get_module_loc_conf(r, ngx_http_auth_jwt_module);
 	
 	if (!jwtcf->auth_jwt_enabled) 
@@ -162,17 +160,11 @@ static ngx_int_t ngx_http_auth_jwt_handler(ngx_http_request_t *r)
 	}
 	
 	// convert key from hex to binary, if a symmetric key
-
 	auth_jwt_algorithm = jwtcf->auth_jwt_algorithm;
 	if (auth_jwt_algorithm.len == 0 || (auth_jwt_algorithm.len == sizeof("HS256") - 1 && ngx_strncmp(auth_jwt_algorithm.data, "HS256", sizeof("HS256") - 1)==0))
 	{
-		keylen = jwtcf->auth_jwt_key.len / 2;
-		keyBinary = ngx_palloc(r->pool, keylen);
-		if (0 != hex_to_binary((char *)jwtcf->auth_jwt_key.data, keyBinary, jwtcf->auth_jwt_key.len))
-		{
-			ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "failed to turn hex key into binary");
-			goto redirect;
-		}
+		keylen = jwtcf->auth_jwt_key.len;
+        keyBinary=jwtcf->auth_jwt_key.data;
 	}
 	else if ( auth_jwt_algorithm.len == sizeof("RS256") - 1 && ngx_strncmp(auth_jwt_algorithm.data, "RS256", sizeof("RS256") - 1) == 0 )
 	{
@@ -190,7 +182,7 @@ static ngx_int_t ngx_http_auth_jwt_handler(ngx_http_request_t *r)
 	jwtParseReturnCode = jwt_decode(&jwt, jwtCookieValChrPtr, keyBinary, keylen);
 	if (jwtParseReturnCode != 0)
 	{
-		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "failed to parse jwt");
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "failed to parse jwt");
 		goto redirect;
 	}
 	
@@ -205,40 +197,73 @@ static ngx_int_t ngx_http_auth_jwt_handler(ngx_http_request_t *r)
 	// validate the exp date of the JWT
 	exp = (time_t)jwt_get_grant_int(jwt, "exp");
 	now = time(NULL);
+    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, ">>>>>>- exp:%d now:%d",exp,now);
 	if (exp < now)
 	{
 		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "the jwt has expired");
 		goto redirect;
 	}
 
-	// extract the userid
-	sub = jwt_get_grant(jwt, "sub");
-	if (sub == NULL)
-	{
-		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "the jwt does not contain a subject");
-	}
-	else
-	{
-		sub_t = ngx_char_ptr_to_str_t(r->pool, (char *)sub);
-		set_custom_header_in_headers_out(r, &useridHeaderName, &sub_t);
-	}
-
-	if (jwtcf->auth_jwt_validate_email == 1)
-	{
-		email = jwt_get_grant(jwt, "emailAddress");
-		if (email == NULL)
-		{
-			ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "the jwt does not contain an email address");
-		}
-		else
-		{
-			email_t = ngx_char_ptr_to_str_t(r->pool, (char *)email);
-			set_custom_header_in_headers_out(r, &emailHeaderName, &email_t);
-		}
-	}
-
-	jwt_free(jwt);
-
+    
+//    ngx_table_elt_t           *disposition;
+//    disposition = (ngx_table_elt_t *)ngx_list_push(&r->headers_out.headers);
+//
+//    if(disposition) {
+//        disposition->hash = 0;
+//        ngx_str_set(&disposition->key, "Content-Disposition");
+//        disposition->value.data = (u_char *)ngx_pcalloc(r->pool, sizeof("attachment; filename=") + oss->name.len);
+//
+//        if(disposition->value.data) {
+//            disposition->hash = 1;
+//            disposition->value.len = ngx_sprintf(disposition->value.data, "attachment; filename=%V", &oss->name) - disposition->value.data;
+//        }
+//    }
+//    static ngx_int_t
+//    ngx_http_auth_basic_set_realm(ngx_http_request_t *r, ngx_str_t *realm)
+//    {
+//        size_t   len;
+//        u_char  *basic, *p;
+//
+//        r->headers_out.www_authenticate = ngx_list_push(&r->headers_out.headers);
+//        if (r->headers_out.www_authenticate == NULL) {
+//            return NGX_HTTP_INTERNAL_SERVER_ERROR;
+//        }
+//
+//        len = sizeof("Basic realm=\"\"") - 1 + realm->len;
+//
+//        basic = ngx_pnalloc(r->pool, len);
+//        if (basic == NULL) {
+//            return NGX_HTTP_INTERNAL_SERVER_ERROR;
+//        }
+//
+//        p = ngx_cpymem(basic, "Basic realm=\"", sizeof("Basic realm=\"") - 1);
+//        p = ngx_cpymem(p, realm->data, realm->len);
+//        *p = '"';
+//
+//        r->headers_out.www_authenticate->hash = 1;
+//        ngx_str_set(&r->headers_out.www_authenticate->key, "WWW-Authenticate");
+//        r->headers_out.www_authenticate->value.data = basic;
+//        r->headers_out.www_authenticate->value.len = len;
+//
+//        return NGX_HTTP_UNAUTHORIZED;
+//    }
+//    tjwt = ngx_palloc(r->pool, strlen(jwt_encode_str(jwt)));
+//    ngx_memcpy(&tjwt, jwt_encode_str(jwt), strlen(jwt_encode_str(jwt)));
+//
+//    {
+//        ngx_str_set(&rjwt,ngx_string(jwt_encode_str(jwt)));
+//    }
+    tjwt =(char *)jwt_encode_str(jwt);
+    h = ngx_list_push(&r-> headers_out.headers);
+    h->hash = 1;
+    h->key.len=authKey.len;
+    h->key.data = authKey.data;
+    h->value.data = (u_char *)ngx_pcalloc(r->pool, sizeof(tjwt));
+    h->value.len = ngx_sprintf(h->value.data, "%s", tjwt)-h-> value.data;
+//    h->value.data = rjwt.data;
+    jwt_free(jwt);
+    
+    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "add ok");
 	return NGX_OK;
 	
 	redirect:

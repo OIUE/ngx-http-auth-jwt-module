@@ -14,5 +14,6 @@
 
 int hex_char_to_binary( char ch, char* ret );
 int hex_to_binary( const char* str, u_char* buf, int len );
+int arrayToStr(u_char *buf, int buflen,char *out);
 
 #endif /* _NGX_HTTP_AUTH_JWT_BINARY_CONVERTERS_H */

@@ -11,7 +11,7 @@ test_jwt () {
   local extra=$4
 
   cmd="curl -X GET -o /dev/null --silent --head --write-out '%{http_code}' http://host.docker.internal:8000$path -H 'cache-control: no-cache' $extra"
-
+#curl -X GET  --silent --head --write-out '%{http_code}' http://127.0.0.1:8080/test/ --header "Authorization: Bearer  eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzb21lLWxvbmctdXVpZCIsImZpcnN0TmFtZSI6ImhlbGxvIiwgImxhc3ROYW1lIjoid29ybGQiLCJlbWFpbEFkZHJlc3MiOiJoZWxsb3dvcmxkQGV4YW1wbGUuY29tIiwgInJvbGVzIjpbInRoaXMiLCJ0aGF0IiwidGhlb3RoZXIiXSwgImlzcyI6Imlzc3VlciIsInBlcnNvbklkIjoiNzViYjNjYzctYjkzMy00NGYwLTkzYzYtMTQ3YjA4MmZhZGI1IiwgImV4cCI6MTkwODgzNTIwMCwiaWF0IjoxNDg4ODE5NjAwLCJ1c2VybmFtZSI6ImhlbGxvLndvcmxkIn0.TvDD63ZOqFKgE-uxPDdP5aGIsbl5xPKz4fMul3Zlti4"
   test=$( eval ${cmd} )
   if [ "$test" -eq "$expect" ];then
     echo -e "${GREEN}${name}: passed (${test})${NONE}";
@@ -43,6 +43,8 @@ main() {
   test_jwt "Secure test with jwt cookie - with no email" "/secure/" "200" " --cookie \"rampartjwt=${MISSING_EMAIL_JWT}\""
 
   test_jwt "Secure test with rs256 jwt cookie" "/secure-rs256/" "200" " --cookie \"rampartjwt=${VALID_RS256_JWT}\""
+
+  test_jwt "Secure test/test with  jwt auth header" "/test/" "200" "--header \"Authorization: Bearer ${VALIDJWT}\""
 }
 
 main "$@"
